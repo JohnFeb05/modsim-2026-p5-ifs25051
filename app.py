@@ -16,7 +16,7 @@ warnings.filterwarnings('ignore')
 # ============================================================================
 
 st.set_page_config(
-    page_title="Simulasi Monte Carlo - Pembangunan Gedung FITE",
+    page_title="Simulasi Monte Carlo - Gedung FITE",
     page_icon="🏗️",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -50,13 +50,6 @@ st.markdown("""
         border-radius: 10px;
         text-align: center;
     }
-    .stage-card {
-        background-color: #F8FAFC;
-        padding: 0.5rem;
-        border-radius: 5px;
-        margin: 0.2rem 0;
-        border-left: 3px solid #10B981;
-    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -64,7 +57,9 @@ st.markdown("""
 # 2. KELAS PEMODELAN SISTEM
 # ============================================================================
 
-class ConstructionStage:
+class ProjectStage:
+    """Kelas untuk memodelkan tahapan proyek"""
+    
     def __init__(self, name, base_params, risk_factors=None, dependencies=None):
         self.name = name
         self.optimistic = base_params['optimistic']
@@ -74,6 +69,7 @@ class ConstructionStage:
         self.dependencies = dependencies or []
         
     def sample_duration(self, n_simulations, risk_multiplier=1.0):
+        """Sampling durasi dengan mempertimbangkan distribusi dan faktor risiko"""
         base_duration = np.random.triangular(
             self.optimistic,
             self.most_likely,
@@ -99,7 +95,10 @@ class ConstructionStage:
         
         return base_duration * risk_multiplier
 
-class MonteCarloConstructionSimulation:
+
+class MonteCarloProjectSimulation:
+    """Kelas untuk menjalankan simulasi Monte Carlo"""
+    
     def __init__(self, stages_config, num_simulations=10000):
         self.stages_config = stages_config
         self.num_simulations = num_simulations
@@ -108,8 +107,9 @@ class MonteCarloConstructionSimulation:
         self.initialize_stages()
         
     def initialize_stages(self):
+        """Inisialisasi objek tahapan dari konfigurasi"""
         for stage_name, config in self.stages_config.items():
-            self.stages[stage_name] = ConstructionStage(
+            self.stages[stage_name] = ProjectStage(
                 name=stage_name,
                 base_params=config['base_params'],
                 risk_factors=config.get('risk_factors', {}),
@@ -117,6 +117,7 @@ class MonteCarloConstructionSimulation:
             )
     
     def run_simulation(self):
+        """Menjalankan simulasi Monte Carlo lengkap"""
         results = pd.DataFrame(index=range(self.num_simulations))
         
         for stage_name, stage in self.stages.items():
@@ -145,6 +146,7 @@ class MonteCarloConstructionSimulation:
         return results
     
     def calculate_critical_path_probability(self):
+        """Menghitung probabilitas setiap tahapan berada di critical path"""
         if self.simulation_results is None:
             raise ValueError("Run simulation first")
         
@@ -166,6 +168,7 @@ class MonteCarloConstructionSimulation:
         return pd.DataFrame(critical_path_probs).T
     
     def analyze_risk_contribution(self):
+        """Analisis kontribusi risiko terhadap variabilitas total durasi"""
         if self.simulation_results is None:
             raise ValueError("Run simulation first")
         
@@ -187,11 +190,13 @@ class MonteCarloConstructionSimulation:
         
         return pd.DataFrame(contributions).T
 
+
 # ============================================================================
 # 3. FUNGSI VISUALISASI PLOTLY
 # ============================================================================
 
 def create_distribution_plot(results):
+    """Membuat plot distribusi durasi total proyek"""
     total_duration = results['Total_Duration']
     mean_duration = total_duration.mean()
     median_duration = np.median(total_duration)
@@ -207,10 +212,10 @@ def create_distribution_plot(results):
         histnorm='probability density'
     ))
     
-    fig.add_vline(x=mean_duration, line_dash="dash", line_color="red", 
-                  annotation_text=f"Mean: {mean_duration:.1f} bulan")
+    fig.add_vline(x=mean_duration, line_dash="dash", line_color="red",
+                  annotation_text=f"Mean: {mean_duration:.1f}")
     fig.add_vline(x=median_duration, line_dash="dash", line_color="green",
-                  annotation_text=f"Median: {median_duration:.1f} bulan")
+                  annotation_text=f"Median: {median_duration:.1f}")
     
     ci_80 = np.percentile(total_duration, [10, 90])
     ci_95 = np.percentile(total_duration, [2.5, 97.5])
@@ -238,7 +243,9 @@ def create_distribution_plot(results):
         'ci_95': ci_95
     }
 
+
 def create_completion_probability_plot(results):
+    """Membuat plot probabilitas penyelesaian proyek"""
     deadlines = np.arange(12, 30, 1)
     completion_probs = []
     
@@ -258,26 +265,12 @@ def create_completion_probability_plot(results):
         fillcolor='rgba(173, 216, 230, 0.3)'
     ))
     
-    fig.add_hline(y=0.5, line_dash="dash", line_color="red", 
+    fig.add_hline(y=0.5, line_dash="dash", line_color="red",
                   annotation_text="50%", annotation_position="right")
     fig.add_hline(y=0.8, line_dash="dash", line_color="green",
                   annotation_text="80%", annotation_position="right")
     fig.add_hline(y=0.95, line_dash="dash", line_color="blue",
                   annotation_text="95%", annotation_position="right")
-    
-    key_deadlines = [16, 20, 24]
-    for dl in key_deadlines:
-        idx = np.where(deadlines == dl)[0]
-        if len(idx) > 0:
-            prob = completion_probs[idx[0]]
-            fig.add_trace(go.Scatter(
-                x=[dl], y=[prob],
-                mode='markers+text',
-                marker=dict(size=12, color='red'),
-                text=[f'{prob:.1%}'],
-                textposition="top center",
-                showlegend=False
-            ))
     
     fig.update_layout(
         title='Kurva Probabilitas Penyelesaian Proyek',
@@ -290,7 +283,9 @@ def create_completion_probability_plot(results):
     
     return fig
 
+
 def create_critical_path_plot(critical_analysis):
+    """Membuat plot analisis critical path"""
     critical_analysis = critical_analysis.sort_values('probability', ascending=True)
     
     fig = go.Figure()
@@ -306,9 +301,6 @@ def create_critical_path_plot(critical_analysis):
         textposition='auto'
     ))
     
-    fig.add_vline(x=0.5, line_dash="dot", line_color="gray")
-    fig.add_vline(x=0.7, line_dash="dot", line_color="orange")
-    
     fig.update_layout(
         title='Analisis Critical Path per Tahapan',
         xaxis_title='Probabilitas Menjadi Critical Path',
@@ -318,7 +310,9 @@ def create_critical_path_plot(critical_analysis):
     
     return fig
 
+
 def create_stage_boxplot(results, stages):
+    """Membuat boxplot distribusi durasi per tahapan"""
     stage_names = list(stages.keys())
     stage_data = [results[stage] for stage in stage_names]
     
@@ -344,7 +338,9 @@ def create_stage_boxplot(results, stages):
     
     return fig
 
+
 def create_risk_contribution_plot(risk_contrib):
+    """Membuat plot kontribusi risiko per tahapan"""
     risk_contrib = risk_contrib.sort_values('contribution_percent', ascending=False)
     
     fig = go.Figure()
@@ -365,35 +361,37 @@ def create_risk_contribution_plot(risk_contrib):
     
     return fig
 
+
 # ============================================================================
 # 4. FUNGSI UTAMA STREAMLIT
 # ============================================================================
 
 def main():
-    st.markdown('<h1 class="main-header">🏗️ Simulasi Monte Carlo - Pembangunan Gedung FITE</h1>', unsafe_allow_html=True)
+    # Header aplikasi
+    st.markdown('<h1 class="main-header">🏗️ Simulasi Monte Carlo - Gedung FITE</h1>', unsafe_allow_html=True)
     
+    # Deskripsi
     st.markdown("""
     <div class="info-box">
-    Estimasi waktu penyelesaian proyek pembangunan gedung FITE 5 lantai dengan fasilitas lengkap 
-    (ruang kelas, laboratorium komputer, laboratorium elektro, laboratorium mobile, laboratorium VR/AR, 
-    laboratorium game, ruang dosen, toilet, dan ruang serbaguna). Aplikasi ini menggunakan simulasi 
-    Monte Carlo untuk memodelkan ketidakpastian dan menghasilkan estimasi waktu yang lebih akurat.
+    Estimasi waktu penyelesaian proyek pembangunan gedung FITE 5 lantai dengan fasilitas lengkap.
+    Aplikasi ini menggunakan simulasi Monte Carlo untuk memodelkan ketidakpastian.
     </div>
     """, unsafe_allow_html=True)
     
     # Sidebar untuk konfigurasi
     st.sidebar.markdown('<h2>⚙️ Konfigurasi Simulasi</h2>', unsafe_allow_html=True)
     
+    # Slider untuk jumlah simulasi (dikurangi untuk menghindari timeout)
     num_simulations = st.sidebar.slider(
         'Jumlah Iterasi Simulasi:',
         min_value=1000,
-        max_value=50000,
-        value=20000,
+        max_value=10000,  # Dikurangi dari 50000 untuk menghindari timeout
+        value=5000,
         step=1000,
         help='Semakin banyak iterasi, semakin akurat hasilnya'
     )
     
-    # Konfigurasi default
+    # Konfigurasi default untuk Gedung FITE
     default_config = {
         "Persiapan_Lahan": {
             "base_params": {"optimistic": 2, "most_likely": 3, "pessimistic": 5},
@@ -418,7 +416,7 @@ def main():
         "Instalasi_Listrik_Dan_Mekanikal": {
             "base_params": {"optimistic": 3, "most_likely": 5, "pessimistic": 8},
             "risk_factors": {
-                "keterlambatan_peralatan_khusus": {"type": "discrete", "probability": 0.3, "impact": 0.35}
+                "keterlambatan_peralatan": {"type": "discrete", "probability": 0.3, "impact": 0.35}
             },
             "dependencies": ["Struktur_Bangunan_5_Lantai"]
         },
@@ -432,7 +430,7 @@ def main():
         "Finishing_Dan_Interior": {
             "base_params": {"optimistic": 3, "most_likely": 4, "pessimistic": 7},
             "risk_factors": {
-                "ketersediaan_material_finishing": {"type": "discrete", "probability": 0.2, "impact": 0.25}
+                "ketersediaan_material": {"type": "discrete", "probability": 0.2, "impact": 0.25}
             },
             "dependencies": ["Pembangunan_Laboratorium_Khusus"]
         },
@@ -485,6 +483,7 @@ def main():
                 'pessimistic': pessimistic
             }
     
+    # Tombol untuk menjalankan
     run_simulation = st.sidebar.button("🚀 Run Simulation", type="primary", use_container_width=True)
     
     # Inisialisasi session state
@@ -496,17 +495,21 @@ def main():
     # Jalankan simulasi ketika tombol ditekan
     if run_simulation:
         with st.spinner('Menjalankan simulasi Monte Carlo... Harap tunggu...'):
-            simulator = MonteCarloConstructionSimulation(
-                stages_config=default_config,
-                num_simulations=num_simulations
-            )
-            
-            results = simulator.run_simulation()
-            
-            st.session_state.simulation_results = results
-            st.session_state.simulator = simulator
-            
-            st.success(f'Simulasi selesai! {num_simulations:,} iterasi berhasil dijalankan.')
+            try:
+                simulator = MonteCarloProjectSimulation(
+                    stages_config=default_config,
+                    num_simulations=num_simulations
+                )
+                
+                results = simulator.run_simulation()
+                
+                st.session_state.simulation_results = results
+                st.session_state.simulator = simulator
+                
+                st.success(f'Simulasi selesai! {num_simulations:,} iterasi berhasil dijalankan.')
+            except Exception as e:
+                st.error(f'Error saat simulasi: {str(e)}')
+                st.stop()
     
     # Tampilkan hasil jika simulasi sudah dijalankan
     if st.session_state.simulation_results is not None:
@@ -555,148 +558,63 @@ def main():
             </div>
             """, unsafe_allow_html=True)
         
-        # BAGIAN 2: VISUALISASI UTAMA
+        # BAGIAN 2: VISUALISASI
         st.markdown('<h2 class="sub-header">📊 Visualisasi Hasil Simulasi</h2>', unsafe_allow_html=True)
         
         tab1, tab2, tab3, tab4 = st.tabs([
-            "📈 Distribusi Durasi", 
-            "🎯 Probabilitas Penyelesaian", 
-            "🔍 Analisis Tahapan", 
+            "📈 Distribusi Durasi",
+            "🎯 Probabilitas Penyelesaian",
+            "🔍 Analisis Tahapan",
             "📊 Analisis Risiko"
         ])
         
         with tab1:
             fig_dist, stats = create_distribution_plot(results)
             st.plotly_chart(fig_dist, use_container_width=True)
-            
-            with st.expander("📋 Detail Statistik Distribusi"):
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.write("**Statistik Deskriptif:**")
-                    st.write(f"- Rata-rata: {stats['mean']:.1f} bulan")
-                    st.write(f"- Median: {stats['median']:.1f} bulan")
-                    st.write(f"- Standar Deviasi: {stats['std']:.1f} bulan")
-                    st.write(f"- Minimum: {stats['min']:.1f} bulan")
-                    st.write(f"- Maximum: {stats['max']:.1f} bulan")
-                
-                with col2:
-                    st.write("**Confidence Intervals:**")
-                    st.write(f"- 80% CI: [{stats['ci_80'][0]:.1f}, {stats['ci_80'][1]:.1f}] bulan")
-                    st.write(f"- 95% CI: [{stats['ci_95'][0]:.1f}, {stats['ci_95'][1]:.1f}] bulan")
         
         with tab2:
             fig_prob = create_completion_probability_plot(results)
             st.plotly_chart(fig_prob, use_container_width=True)
-            
-            with st.expander("📅 Analisis Probabilitas Deadline"):
-                deadlines = [16, 20, 24]
-                cols = st.columns(len(deadlines))
-                
-                for i, deadline in enumerate(deadlines):
-                    prob_on_time = np.mean(total_duration <= deadline)
-                    prob_late = 1 - prob_on_time
-                    
-                    with cols[i]:
-                        st.metric(
-                            label=f"Deadline {deadline} bulan",
-                            value=f"{prob_on_time:.1%}",
-                            delta=f"{prob_late:.1%} terlambat" if prob_late > 0 else "Tepat waktu",
-                            delta_color="inverse"
-                        )
         
         with tab3:
             col1, col2 = st.columns(2)
-            
             with col1:
                 critical_analysis = simulator.calculate_critical_path_probability()
                 fig_critical = create_critical_path_plot(critical_analysis)
                 st.plotly_chart(fig_critical, use_container_width=True)
-            
             with col2:
                 fig_boxplot = create_stage_boxplot(results, simulator.stages)
                 st.plotly_chart(fig_boxplot, use_container_width=True)
-            
-            with st.expander("🔍 Detail Analisis Critical Path"):
-                critical_df = critical_analysis.sort_values('probability', ascending=False)
-                st.dataframe(critical_df, use_container_width=True)
         
         with tab4:
             col1, col2 = st.columns(2)
-            
             with col1:
                 risk_contrib = simulator.analyze_risk_contribution()
                 fig_risk = create_risk_contribution_plot(risk_contrib)
                 st.plotly_chart(fig_risk, use_container_width=True)
-            
             with col2:
-                st.write("**Heatmap Korelasi akan ditampilkan di sini**")
-            
-            with st.expander("📋 Detail Analisis Kontribusi Risiko"):
-                st.dataframe(risk_contrib, use_container_width=True)
+                st.info("Heatmap korelasi dapat ditambahkan di sini")
         
-        # BAGIAN 3: ANALISIS DEADLINE DAN REKOMENDASI
-        st.markdown('<h2 class="sub-header">🎯 Analisis Deadline & Rekomendasi</h2>', unsafe_allow_html=True)
+        # BAGIAN 3: REKOMENDASI
+        st.markdown('<h2 class="sub-header">🎯 Rekomendasi</h2>', unsafe_allow_html=True)
         
-        col1, col2 = st.columns(2)
+        safety_buffer = np.percentile(total_duration, 80) - mean_duration
+        contingency_reserve = np.percentile(total_duration, 95) - mean_duration
         
-        with col1:
-            target_deadline = st.number_input(
-                "Masukkan deadline target (bulan):",
-                min_value=12,
-                max_value=36,
-                value=20,
-                step=1
-            )
-            
-            prob_target = np.mean(total_duration <= target_deadline)
-            days_at_risk = max(0, np.percentile(total_duration, 95) - target_deadline)
-            
-            st.metric(
-                label=f"Probabilitas selesai dalam {target_deadline} bulan",
-                value=f"{prob_target:.1%}",
-                delta=f"Potensi keterlambatan: {days_at_risk:.1f} bulan" if days_at_risk > 0 else "Tepat waktu",
-                delta_color="inverse"
-            )
-        
-        with col2:
-            safety_buffer = np.percentile(total_duration, 80) - mean_duration
-            contingency_reserve = np.percentile(total_duration, 95) - mean_duration
-            
-            st.markdown(f"""
-            <div class="info-box">
-                <h4>🏗️ Rekomendasi Manajemen Risiko:</h4>
-                • <b>Safety Buffer</b> (untuk 80% confidence): <b>{safety_buffer:.1f} bulan</b><br>
-                • <b>Contingency Reserve</b> (untuk 95% confidence): <b>{contingency_reserve:.1f} bulan</b><br><br>
-                • <b>Estimasi jadwal yang direkomendasikan:</b><br>
-                    {mean_duration:.1f} + {safety_buffer:.1f} = <b>{mean_duration + safety_buffer:.1f} bulan</b>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        # BAGIAN 4: INFORMASI TEKNIS
-        with st.expander("ℹ️ Informasi Teknis Simulasi", expanded=False):
-            st.write(f"**Parameter Simulasi:**")
-            st.write(f"- Jumlah iterasi: {num_simulations:,}")
-            st.write(f"- Jumlah tahapan: {len(simulator.stages)}")
-            st.write(f"- Seed acak: 42 (untuk hasil yang dapat direproduksi)")
-            
-            st.write(f"\n**Konfigurasi Tahapan:**")
-            for stage_name, config in default_config.items():
-                base = config['base_params']
-                st.markdown(f"""
-                <div class="stage-card">
-                    <b>{stage_name.replace('_', ' ')}</b><br>
-                    • Optimistic: {base['optimistic']} bulan<br>
-                    • Most Likely: {base['most_likely']} bulan<br>
-                    • Pessimistic: {base['pessimistic']} bulan
-                </div>
-                """, unsafe_allow_html=True)
+        st.markdown(f"""
+        <div class="info-box">
+            <h4>🏗️ Manajemen Risiko:</h4>
+            • <b>Safety Buffer</b> (80% confidence): <b>{safety_buffer:.1f} bulan</b><br>
+            • <b>Contingency Reserve</b> (95% confidence): <b>{contingency_reserve:.1f} bulan</b><br>
+            • <b>Estimasi direkomendasikan:</b> {mean_duration:.1f} + {safety_buffer:.1f} = <b>{mean_duration + safety_buffer:.1f} bulan</b>
+        </div>
+        """, unsafe_allow_html=True)
     
     else:
         st.markdown("""
         <div style="text-align: center; padding: 4rem; background-color: #f8f9fa; border-radius: 10px;">
             <h3>🚀 Siap untuk memulai simulasi?</h3>
-            <p>Atur parameter di sidebar kiri, lalu klik tombol <b>"Run Simulation"</b> untuk memulai analisis.</p>
-            <p>📊 Hasil simulasi akan ditampilkan di sini setelah proses selesai.</p>
+            <p>Atur parameter di sidebar kiri, lalu klik tombol <b>"Run Simulation"</b></p>
         </div>
         """, unsafe_allow_html=True)
     
@@ -704,10 +622,11 @@ def main():
     st.markdown("---")
     st.markdown("""
     <div style="text-align: center; color: #666; font-size: 0.9rem;">
-    <p><b>Simulasi Monte Carlo untuk Estimasi Waktu Pembangunan Gedung FITE</b></p>
-    <p>⚠️ Hasil simulasi ini merupakan estimasi probabilistik dan bukan prediksi pasti.</p>
+    <p><b>Simulasi Monte Carlo - Gedung FITE</b></p>
+    <p>⚠️ Hasil simulasi merupakan estimasi probabilistik</p>
     </div>
     """, unsafe_allow_html=True)
+
 
 if __name__ == "__main__":
     main()

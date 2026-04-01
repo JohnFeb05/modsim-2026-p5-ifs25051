@@ -1,5 +1,5 @@
 pip --upgrade
-streamlit
+streamlit==1.28.0
 numpy==1.26.3
 pandas==2.1.4
 plotly==5.18.0
